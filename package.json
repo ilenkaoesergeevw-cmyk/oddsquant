@@ -1,0 +1,26 @@
+{
+  "name": "mistral-chat-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal chat web app calling the Mistral API with the official TypeScript SDK (mistral-small-latest). The API key stays server-side.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mistralai/mistralai": "^3.5.0",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.15.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
