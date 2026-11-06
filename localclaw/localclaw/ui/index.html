@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LocalClaw 本地智能体</title>
+<link rel="stylesheet" href="/static/style.css">
+<script>window.LC_TOKEN = "__LC_TOKEN__";</script>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">🦀 LocalClaw</div>
+    <button id="btn-new" class="primary">＋ 新任务</button>
+    <div class="section-title">任务（聊天记忆）</div>
+    <div id="sessions"></div>
+    <div class="section-title">模型 <button id="btn-refresh-models" class="mini">刷新</button></div>
+    <div id="providers"></div>
+    <div class="section-title">技能（兼容 OpenClaw SKILL.md） <button id="btn-refresh-skills" class="mini">刷新</button></div>
+    <div id="skills"></div>
+    <div class="section-title">设置</div>
+    <div id="settings">
+      <label>项目目录（当前任务工作目录）</label>
+      <input id="inp-project" placeholder="如 C:\\Users\\me\\myproject">
+      <label>允许访问的根目录（每行一个）</label>
+      <textarea id="inp-roots" rows="3"></textarea>
+      <button id="btn-save-config" class="mini">保存设置</button>
+    </div>
+  </aside>
+  <main id="main">
+    <div id="toolbar">
+      <button id="btn-attach" title="上传图片/视频/文件到聊天">📎 附件</button>
+      <button id="btn-shot" title="截取当前屏幕到聊天">🖼 截图</button>
+      <button id="btn-zip" title="把项目目录打包为 zip">📦 打包 ZIP</button>
+      <button id="btn-office" title="控制 Word / PPT">📄 Office</button>
+      <input type="file" id="file-input" multiple style="display:none">
+    </div>
+    <div id="office-panel" class="hidden">
+      <select id="office-app"><option value="word">Word</option><option value="ppt">PPT</option></select>
+      <input id="office-path" placeholder="保存路径，如 C:\\docs\\a.docx">
+      <input id="office-text" placeholder="Word 正文 / PPT 标题">
+      <button id="btn-office-run" class="mini">执行</button>
+      <span id="office-result"></span>
+    </div>
+    <div id="chat"></div>
+    <div id="composer">
+      <div id="pending-attachments"></div>
+      <div id="composer-row">
+        <textarea id="input" rows="3" placeholder="输入消息，回车发送（Shift+回车换行）"></textarea>
+        <button id="btn-send" class="primary">发送</button>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
