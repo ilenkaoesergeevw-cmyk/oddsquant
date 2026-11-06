@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>e2e-sync · 端对端加密传输</title>
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #f4f4f5;
+        color: #18181b;
+        display: flex;
+        justify-content: center;
+      }
+      .app { width: 100%; max-width: 760px; min-height: 100dvh; display: flex; flex-direction: column; }
+      header { padding: 12px 16px; background: #fff; border-bottom: 1px solid #e4e4e7; font-weight: 600; }
+      header small { display: block; font-weight: 400; color: #71717a; }
+      #login { padding: 24px 16px; display: flex; flex-direction: column; gap: 10px; }
+      #login input {
+        padding: 10px 12px; border: 1px solid #d4d4d8; border-radius: 10px; font-size: 15px;
+      }
+      #login button, #send, #pick {
+        padding: 10px 18px; border: 0; border-radius: 10px; background: #18181b; color: #fff;
+        font-size: 15px; cursor: pointer;
+      }
+      #chat { display: none; flex: 1; flex-direction: column; }
+      #peers { padding: 6px 16px; font-size: 13px; color: #52525b; background: #fff; border-bottom: 1px solid #e4e4e7; }
+      #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+      .msg { max-width: 85%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: break-word; line-height: 1.45; }
+      .from-me { align-self: flex-end; background: #ffd11a; border-bottom-right-radius: 4px; }
+      .from-peer { align-self: flex-start; background: #fff; border: 1px solid #e4e4e7; border-bottom-left-radius: 4px; }
+      .meta { font-size: 12px; color: #71717a; margin-bottom: 4px; }
+      .filecard { display: flex; flex-direction: column; gap: 6px; }
+      .filecard img { max-width: 260px; border-radius: 8px; }
+      .filecard a { color: #2563eb; }
+      progress { width: 200px; }
+      #composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #e4e4e7; background: #fff; align-items: flex-end; }
+      #input { flex: 1; padding: 10px 12px; border: 1px solid #d4d4d8; border-radius: 10px; font-size: 15px; resize: vertical; min-height: 42px; max-height: 200px; }
+      #pick { background: #52525b; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #09090b; color: #fafafa; }
+        header, #peers, #composer { background: #18181b; border-color: #27272a; }
+        .from-peer { background: #27272a; border-color: #3f3f46; }
+        #login input, #input { background: #09090b; color: #fafafa; border-color: #3f3f46; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        e2e-sync
+        <small>端对端加密 · 输入口令即可自动配对 · 服务器只中继密文 · 文字和文件大小均不限</small>
+      </header>
+
+      <div id="login">
+        <input id="passphrase" type="password" placeholder="口令（两台设备输入相同口令，回车即自动配对）" autocomplete="off" />
+        <button id="connect">连接</button>
+        <div id="login-error" style="color:#b91c1c"></div>
+      </div>
+
+      <div id="chat">
+        <div id="peers">在线设备：-</div>
+        <div id="messages"></div>
+        <div id="composer">
+          <textarea id="input" placeholder="输入文字（大小不限）…"></textarea>
+          <button id="pick">选文件/图片</button>
+          <input id="files" type="file" multiple style="display:none" />
+          <button id="send">发送</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { deriveKey, authToken, pairingCode, randomId } from "./crypto.js";
+      import { sendText, sendFile, sendPayload, Inbox } from "./core.js";
+
+      const $ = (id) => document.getElementById(id);
+      let key = null;
+      let ws = null;
+      let inbox = null;
+
+      function addMessage(from, node) {
+        const div = document.createElement("div");
+        div.className = "msg " + (from === "me" ? "from-me" : "from-peer");
+        if (from !== "me") {
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          meta.textContent = from;
+          div.appendChild(meta);
+        }
+        div.appendChild(node);
+        $("messages").appendChild(div);
+        $("messages").scrollTop = $("messages").scrollHeight;
+        return div;
+      }
+
+      function textNode(text) {
+        const span = document.createElement("span");
+        span.textContent = text;
+        return span;
+      }
+
+      let pairing = "";
+
+      async function connect() {
+        $("login-error").textContent = "";
+        if (!$("passphrase").value) {
+          $("login-error").textContent = "请输入口令";
+          return;
+        }
+        key = await deriveKey($("passphrase").value);
+        const token = await authToken(key);
+        pairing = pairingCode(token);
+        const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+        const name = (isMobile ? "phone-" : "pc-") + randomId().slice(0, 4);
+        const proto = location.protocol === "https:" ? "wss" : "ws";
+        ws = new WebSocket(`${proto}://${location.host}`);
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ t: "hello", auth: token, name }));
+          $("login").style.display = "none";
+          $("chat").style.display = "flex";
+          inbox = new Inbox(key, onEvent);
+        };
+        ws.onmessage = async (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.t === "peers") {
+            $("peers").textContent =
+              `配对码 ${pairing}（两台设备显示一致即配对成功）｜ 在线设备：` + msg.peers.join("、");
+          } else if (msg.t === "msg" && inbox) {
+            try {
+              await inbox.handle(msg.from, msg.payload);
+            } catch (e) {
+              console.error("decrypt failed", e);
+            }
+          }
+        };
+        ws.onclose = () => {
+          $("peers").textContent = "连接已断开，请刷新页面重连";
+        };
+      }
+
+      $("connect").addEventListener("click", connect);
+      $("passphrase").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") connect();
+      });
+
+      function onEvent(ev) {
+        if (ev.type === "text") {
+          addMessage(ev.from, textNode(ev.body));
+        } else if (ev.type === "file-start") {
+          const card = document.createElement("div");
+          card.className = "filecard";
+          card.innerHTML = `<div>${ev.name}（${(ev.size / 1048576).toFixed(2)} MB）</div>`;
+          const bar = document.createElement("progress");
+          bar.max = ev.total;
+          bar.value = 0;
+          card.appendChild(bar);
+          card.dataset.id = ev.id;
+          addMessage(ev.from, card);
+        } else if (ev.type === "file-progress") {
+          const card = document.querySelector(`.filecard[data-id="${ev.id}"]`);
+          if (card) card.querySelector("progress").value = ev.received;
+        } else if (ev.type === "file-done") {
+          const url = URL.createObjectURL(ev.blob);
+          const card = document.querySelector(`.filecard[data-id]`);
+          const holder = document.createElement("div");
+          holder.className = "filecard";
+          if (ev.mime.startsWith("image/")) {
+            const img = document.createElement("img");
+            img.src = url;
+            holder.appendChild(img);
+          }
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = ev.name;
+          a.textContent = `下载 ${ev.name}（${(ev.size / 1048576).toFixed(2)} MB）`;
+          holder.appendChild(a);
+          addMessage(ev.from, holder);
+        }
+      }
+
+      $("send").addEventListener("click", async () => {
+        const text = $("input").value;
+        if (!text || !ws || ws.readyState !== 1) return;
+        $("input").value = "";
+        addMessage("me", textNode(text));
+        await sendText(key, ws, text);
+      });
+
+      $("input").addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          $("send").click();
+        }
+      });
+
+      $("pick").addEventListener("click", () => $("files").click());
+      $("files").addEventListener("change", async (e) => {
+        for (const file of e.target.files) {
+          const card = document.createElement("div");
+          card.className = "filecard";
+          card.innerHTML = `<div>发送中：${file.name}</div>`;
+          const bar = document.createElement("progress");
+          bar.max = 1;
+          bar.value = 0;
+          card.appendChild(bar);
+          addMessage("me", card);
+          await sendFile(key, ws, file, (done, total) => {
+            bar.max = total;
+            bar.value = done;
+          });
+          card.firstChild.textContent = `已发送：${file.name}（${(file.size / 1048576).toFixed(2)} MB）`;
+        }
+        e.target.value = "";
+      });
+    </script>
+  </body>
+</html>

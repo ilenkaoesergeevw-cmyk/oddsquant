@@ -1,0 +1,28 @@
+name: e2e-sync CI
+
+on:
+  push:
+    paths:
+      - "e2e-sync/**"
+      - ".github/workflows/e2e-sync-ci.yml"
+  pull_request:
+    paths:
+      - "e2e-sync/**"
+      - ".github/workflows/e2e-sync-ci.yml"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e2e-sync
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e-sync/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
