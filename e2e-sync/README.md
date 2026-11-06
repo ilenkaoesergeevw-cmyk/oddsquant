@@ -31,10 +31,13 @@ npm install
 npm run dev        # or: npm start   (PORT=8080 by default)
 ```
 
-Then open `http://<server-host>:8080` on **both** devices (phone + PC), enter the same
-passphrase and a device name, click 连接. Type text or pick files/images — the other
-device receives them decrypted, with progress bars. If the peer is offline, the server
-queues the ciphertext (in memory) and delivers it when the peer reconnects.
+Then open `http://<server-host>:8080` on **both** devices (phone + PC) and enter the
+same passphrase — press Enter (or click 连接) and the device **auto-pairs**: the device
+name is generated automatically and both sides show the same **pairing code**
+(`pairingCode` derived from the key); matching codes confirm you are paired with the
+right key. Type text or pick files/images — the other device receives them decrypted,
+with progress bars. If the peer is offline, the server queues the ciphertext (in
+memory) and delivers it when the peer reconnects.
 
 ## Deploying for cross-country use (your own server)
 

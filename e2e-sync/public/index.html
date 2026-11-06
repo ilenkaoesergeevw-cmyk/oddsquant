@@ -52,12 +52,11 @@
     <div class="app">
       <header>
         e2e-sync
-        <small>端对端加密 · 服务器只中继密文，不接触明文和密钥 · 文字和文件大小均不限</small>
+        <small>端对端加密 · 输入口令即可自动配对 · 服务器只中继密文 · 文字和文件大小均不限</small>
       </header>
 
       <div id="login">
-        <input id="passphrase" type="password" placeholder="口令（两台设备必须相同，建议长口令）" autocomplete="off" />
-        <input id="devname" placeholder="本机名称，例如 us-pc / china-phone" autocomplete="off" />
+        <input id="passphrase" type="password" placeholder="口令（两台设备输入相同口令，回车即自动配对）" autocomplete="off" />
         <button id="connect">连接</button>
         <div id="login-error" style="color:#b91c1c"></div>
       </div>
@@ -75,7 +74,7 @@
     </div>
 
     <script type="module">
-      import { deriveKey, authToken } from "./crypto.js";
+      import { deriveKey, authToken, pairingCode, randomId } from "./crypto.js";
       import { sendText, sendFile, sendPayload, Inbox } from "./core.js";
 
       const $ = (id) => document.getElementById(id);
@@ -104,19 +103,23 @@
         return span;
       }
 
-      $("connect").addEventListener("click", async () => {
+      let pairing = "";
+
+      async function connect() {
         $("login-error").textContent = "";
-        try {
-          key = await deriveKey($("passphrase").value);
-        } catch (e) {
-          $("login-error").textContent = "口令不能为空";
+        if (!$("passphrase").value) {
+          $("login-error").textContent = "请输入口令";
           return;
         }
+        key = await deriveKey($("passphrase").value);
         const token = await authToken(key);
+        pairing = pairingCode(token);
+        const isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+        const name = (isMobile ? "phone-" : "pc-") + randomId().slice(0, 4);
         const proto = location.protocol === "https:" ? "wss" : "ws";
         ws = new WebSocket(`${proto}://${location.host}`);
         ws.onopen = () => {
-          ws.send(JSON.stringify({ t: "hello", auth: token, name: $("devname").value || "device" }));
+          ws.send(JSON.stringify({ t: "hello", auth: token, name }));
           $("login").style.display = "none";
           $("chat").style.display = "flex";
           inbox = new Inbox(key, onEvent);
@@ -124,7 +127,8 @@
         ws.onmessage = async (ev) => {
           const msg = JSON.parse(ev.data);
           if (msg.t === "peers") {
-            $("peers").textContent = "在线设备：" + msg.peers.join("、");
+            $("peers").textContent =
+              `配对码 ${pairing}（两台设备显示一致即配对成功）｜ 在线设备：` + msg.peers.join("、");
           } else if (msg.t === "msg" && inbox) {
             try {
               await inbox.handle(msg.from, msg.payload);
@@ -136,6 +140,11 @@
         ws.onclose = () => {
           $("peers").textContent = "连接已断开，请刷新页面重连";
         };
+      }
+
+      $("connect").addEventListener("click", connect);
+      $("passphrase").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") connect();
       });
 
       function onEvent(ev) {

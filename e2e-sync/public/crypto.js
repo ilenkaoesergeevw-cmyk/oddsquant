@@ -66,3 +66,12 @@ export async function decrypt(key, envelope) {
 export function randomId() {
   return b64encode(crypto.getRandomValues(new Uint8Array(16)));
 }
+
+export function pairingCode(token) {
+  return token
+    .replace(/[^A-Za-z0-9]/g, "")
+    .slice(0, 8)
+    .toUpperCase()
+    .match(/.{1,4}/g)
+    .join("-");
+}
