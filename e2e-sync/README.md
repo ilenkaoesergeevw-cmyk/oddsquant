@@ -31,6 +31,10 @@ npm install
 npm run dev        # or: npm start   (PORT=8080 by default)
 ```
 
+On Windows you can also just double-click `e2e-sync/start.bat` — it clears the
+`NODE_OPTIONS` preload quirk, installs dependencies if needed, and starts the server
+(the window stays open thanks to `pause` at the end).
+
 Then open `http://<server-host>:8080` on **both** devices (phone + PC) and enter the
 same passphrase — press Enter (or click 连接) and the device **auto-pairs**: the device
 name is generated automatically and both sides show the same **pairing code**
